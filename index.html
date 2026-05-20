@@ -655,15 +655,15 @@ function parseWorkbook(wb) {
     grouped[customer].push(inv);
   }
 
-  // Build customer list, sort invoices by date desc (matches your sample PDF)
+  // Build customer list, sort invoices by date ascending (oldest first)
   const customers = Object.keys(grouped).sort((a, b) => a.localeCompare(b)).map(name => {
     const invoices = grouped[name].slice().sort((a, b) => {
-      // sort by date descending; parse dd/mm/yyyy
+      // sort by date ascending; parse dd/mm/yyyy
       const toD = (s) => {
         const m = String(s).match(/(\d{2})\/(\d{2})\/(\d{4})/);
         return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0;
       };
-      return toD(b.date) - toD(a.date);
+      return toD(a.date) - toD(b.date);
     });
     const totalOpen = invoices.reduce((s, x) => s + x.open, 0);
     const totalAmount = invoices.reduce((s, x) => s + x.amount, 0);
