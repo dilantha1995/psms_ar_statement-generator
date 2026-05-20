@@ -641,13 +641,15 @@ function parseWorkbook(wb) {
       status: status
     };
     // Classify status
+    // IMPORTANT ordering: "cleared on" wins over everything — once MOFT clears a doc,
+    // it must never appear under Pending MOFT or Pending Payment from MOFT, even if
+    // the open balance in QBO is still non-zero (knock-off lag).
     const sl = status.toLowerCase();
-    if (/could not be found|contact agency/.test(sl)) inv.statusClass = 'pending_moft';
+    if (/cleared on/.test(sl)) inv.statusClass = 'cleared';
+    else if (/parked on/.test(sl)) inv.statusClass = 'parked';
+    else if (/could not be found|contact agency/.test(sl)) inv.statusClass = 'pending_moft';
     else if (/posted on/.test(sl)) inv.statusClass = 'pending_payment';
-    else if (/cleared on/.test(sl)) {
-      // "Cleared on" but still has substantial open balance → partial payment, treat as pending_payment
-      inv.statusClass = Math.abs(open) >= 1.00 ? 'pending_payment' : 'cleared';
-    }
+    else if (/^pending payment$/.test(sl.trim())) inv.statusClass = 'pending_payment';
     else inv.statusClass = 'other';
     if (!grouped[customer]) grouped[customer] = [];
     grouped[customer].push(inv);
@@ -670,12 +672,16 @@ function parseWorkbook(wb) {
     // Statement type buckets
     const pendingMoft = invoices.filter(x => x.statusClass === 'pending_moft');
     const pendingPayment = invoices.filter(x => x.statusClass === 'pending_payment');
+    const cleared = invoices.filter(x => x.statusClass === 'cleared');
+    const parked = invoices.filter(x => x.statusClass === 'parked');
 
     return {
       name, type, invoices, totalOpen, totalAmount,
-      pendingMoft, pendingPayment,
-      pendingMoftTotal: pendingMoft.reduce((s, x) => s + x.open, 0),
-      pendingPaymentTotal: pendingPayment.reduce((s, x) => s + x.open, 0)
+      pendingMoft, pendingPayment, cleared, parked,
+      pendingMoftTotal:    pendingMoft.reduce((s, x) => s + x.open, 0),
+      pendingPaymentTotal: pendingPayment.reduce((s, x) => s + x.open, 0),
+      clearedTotal:        cleared.reduce((s, x) => s + x.open, 0),
+      parkedTotal:         parked.reduce((s, x) => s + x.open, 0)
     };
   });
 
@@ -765,6 +771,18 @@ function renderAll() {
               `Pending Payment from MOFT`,
               `${c.pendingPayment.length} inv · ${fmtMoney(c.pendingPaymentTotal)}`,
               c.pendingPayment.length > 0, 'blue'));
+            if (c.cleared.length > 0) {
+              stmtCells.push(stmtRow(cust, 'cleared',
+                `Cleared by MOFT (knock-off pending in QBO)`,
+                `${c.cleared.length} inv · ${fmtMoney(c.clearedTotal)}`,
+                true, 'green'));
+            }
+            if (c.parked.length > 0) {
+              stmtCells.push(stmtRow(cust, 'parked',
+                `Parked at MOFT`,
+                `${c.parked.length} inv · ${fmtMoney(c.parkedTotal)}`,
+                true, 'amber'));
+            }
             stmtCells.push(stmtRow(cust, 'combined',
               `Combined SOA`,
               `${c.invoices.length} inv · ${fmtMoney(c.totalOpen)}`,
@@ -857,6 +875,20 @@ function statementMeta(customer, kind) {
         filename: `${safe}_Pending_Payment_from_MOFT_${dateStr}`,
         shortLabel: 'Pending MOFT Payment'
       };
+    case 'cleared':
+      return {
+        title: 'List of Invoice Cleared by Ministry of Finance (Knock-off Pending)',
+        invoices: customer.cleared,
+        filename: `${safe}_Cleared_by_MOFT_${dateStr}`,
+        shortLabel: 'Cleared by MOFT'
+      };
+    case 'parked':
+      return {
+        title: 'List of Invoice Parked at Ministry of Finance',
+        invoices: customer.parked,
+        filename: `${safe}_Parked_at_MOFT_${dateStr}`,
+        shortLabel: 'Parked at MOFT'
+      };
     case 'combined':
       return {
         title: 'Statement of Account',
@@ -882,6 +914,8 @@ function getStatementsFor(customer) {
   if (isGvt) {
     if (customer.pendingMoft.length > 0)    out.push({ kind: 'pending_moft',    meta: statementMeta(customer, 'pending_moft') });
     if (customer.pendingPayment.length > 0) out.push({ kind: 'pending_payment', meta: statementMeta(customer, 'pending_payment') });
+    if (customer.cleared.length > 0)        out.push({ kind: 'cleared',         meta: statementMeta(customer, 'cleared') });
+    if (customer.parked.length > 0)         out.push({ kind: 'parked',          meta: statementMeta(customer, 'parked') });
     out.push({ kind: 'combined', meta: statementMeta(customer, 'combined') });
   } else {
     out.push({ kind: 'soa', meta: statementMeta(customer, 'soa') });
@@ -992,6 +1026,8 @@ function buildCustomerPdf(customer, kind) {
             data.cell.styles.textColor = [10, 95, 168];
           } else if (status.includes('cleared on')) {
             data.cell.styles.textColor = [42, 157, 111];
+          } else if (status.includes('parked on')) {
+            data.cell.styles.textColor = [98, 49, 168];
           }
         }
         if (data.row.index === body.length - 1) {
