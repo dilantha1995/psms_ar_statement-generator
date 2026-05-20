@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ProSynergy — Customer Statement Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --green-900: #0f3d2e;
+    --green-700: #1a6b4f;
+    --green-500: #2a9d6f;
+    --green-100: #e6f4ee;
+    --green-50:  #f3faf6;
+    --ink-900: #0d1f17;
+    --ink-700: #2c3e36;
+    --ink-500: #5b6c64;
+    --ink-300: #9aa8a2;
+    --ink-100: #d8e0dc;
+    --bg:      #f6f8f6;
+    --surface: #ffffff;
+    --amber:   #b76e00;
+    --amber-bg:#fff5e0;
+    --red:     #b3261e;
+    --red-bg:  #fdecea;
+    --blue:    #0a5fa8;
+    --blue-bg: #e6f1fb;
+    --grey-bg: #f0f2ef;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink-900);
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .app {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+  }
+  header.brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--ink-100);
+    margin-bottom: 28px;
+  }
+  .brand-left {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .logo {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--green-700), var(--green-500));
+    display: grid; place-items: center;
+    color: white; font-weight: 800; font-size: 20px;
+    letter-spacing: -0.5px;
+    box-shadow: 0 6px 14px rgba(26,107,79,0.25);
+  }
+  .brand-text h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--green-900);
+    letter-spacing: -0.2px;
+  }
+  .version {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--green-700);
+    background: var(--green-100);
+    padding: 2px 7px;
+    border-radius: 999px;
+    vertical-align: middle;
+    letter-spacing: 0.3px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .brand-text p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--ink-500);
+  }
+  .brand-right {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-500);
+    text-align: right;
+  }
+  .brand-right strong { color: var(--green-700); display: block; font-size: 13px; }
+
+  .upload-card {
+    background: var(--surface);
+    border: 1.5px dashed var(--ink-100);
+    border-radius: 16px;
+    padding: 36px;
+    text-align: center;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .upload-card:hover, .upload-card.drag {
+    border-color: var(--green-500);
+    background: var(--green-50);
+  }
+  .upload-card .icon {
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    background: var(--green-100);
+    color: var(--green-700);
+    display: grid; place-items: center;
+    margin: 0 auto 14px;
+  }
+  .upload-card h2 {
+    margin: 0 0 6px;
+    font-size: 17px;
+    color: var(--green-900);
+  }
+  .upload-card p { margin: 0; color: var(--ink-500); font-size: 13px; }
+  .upload-card input { display: none; }
+
+  .panel {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 24px;
+    margin-top: 20px;
+    border: 1px solid var(--ink-100);
+  }
+
+  .summary-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .stat {
+    background: var(--green-50);
+    padding: 14px 16px;
+    border-radius: 12px;
+    border-left: 3px solid var(--green-500);
+  }
+  .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-500); font-weight: 600; }
+  .stat .value { font-size: 20px; font-weight: 700; color: var(--green-900); margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .controls input[type=text] {
+    flex: 1;
+    min-width: 200px;
+    padding: 10px 14px;
+    border: 1px solid var(--ink-100);
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--bg);
+    transition: all 0.15s;
+  }
+  .controls input[type=text]:focus {
+    outline: none;
+    border-color: var(--green-500);
+    background: white;
+    box-shadow: 0 0 0 3px var(--green-100);
+  }
+  .filter-pills { display: flex; gap: 6px; }
+  .pill {
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--ink-100);
+    background: var(--bg);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-700);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pill:hover { background: var(--green-50); border-color: var(--green-100); }
+  .pill.active { background: var(--green-700); color: white; border-color: var(--green-700); }
+
+  table.customers {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.customers thead th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--grey-bg);
+    color: var(--ink-700);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--ink-100);
+  }
+  table.customers tbody td {
+    padding: 12px;
+    border-bottom: 1px solid var(--ink-100);
+    vertical-align: middle;
+  }
+  table.customers tbody tr:hover { background: var(--green-50); }
+  table.customers .num { font-family: 'JetBrains Mono', monospace; text-align: right; white-space: nowrap; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+  }
+  .badge.gvt { background: var(--blue-bg); color: var(--blue); }
+  .badge.pvt { background: var(--amber-bg); color: var(--amber); }
+  .badge.semi { background: #f0e9fb; color: #6231a8; }
+
+  .btn {
+    border: none;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--green-700); color: white; }
+  .btn-primary:hover { background: var(--green-900); }
+  .btn-secondary { background: var(--bg); color: var(--ink-700); border: 1px solid var(--ink-100); }
+  .btn-secondary:hover { background: var(--green-50); border-color: var(--green-500); color: var(--green-700); }
+  .btn-bulk {
+    background: var(--green-900);
+    color: white;
+    padding: 11px 18px;
+    font-size: 13px;
+  }
+  .btn-bulk:hover { background: var(--ink-900); }
+  .btn-bulk:disabled { background: var(--ink-300); cursor: not-allowed; }
+  .btn-bulk-amber { background: var(--amber); }
+  .btn-bulk-amber:hover { background: #8f5600; }
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+  .stmt-stack { display: flex; flex-direction: column; gap: 6px; }
+  .stmt-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border-radius: 8px;
+    border: 1px solid var(--ink-100);
+  }
+  .stmt-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .stmt-meta { flex: 1; min-width: 0; }
+  .stmt-label { font-weight: 600; font-size: 12px; color: var(--ink-900); }
+  .stmt-sub { font-size: 11px; color: var(--ink-500); font-family: 'JetBrains Mono', monospace; margin-top: 1px; }
+  .stmt-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+  .empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--ink-500);
+  }
+  .empty-svg { margin-bottom: 16px; opacity: 0.4; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--green-900);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  .help-box {
+    background: var(--blue-bg);
+    border-left: 3px solid var(--blue);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--ink-700);
+    margin-top: 16px;
+  }
+  .help-box strong { color: var(--blue); }
+
+  .diagnostics {
+    background: var(--green-50);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    border: 1px solid var(--green-100);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .diagnostics.has-warning {
+    background: var(--amber-bg);
+    border-color: #f5d49a;
+  }
+  .diagnostics .diag-meta {
+    color: var(--ink-700);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    flex: 1;
+  }
+  .diagnostics .diag-meta b { color: var(--green-900); }
+  .diagnostics .diag-meta.warn b { color: var(--amber); }
+  .diag-warnings {
+    width: 100%;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--ink-100);
+    color: var(--amber);
+    font-size: 11.5px;
+  }
+  .diag-warnings ul { margin: 4px 0 0; padding-left: 18px; }
+
+  @media (max-width: 720px) {
+    .summary-bar { grid-template-columns: repeat(2, 1fr); }
+    .brand-right { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="brand">
+    <div class="brand-left">
+      <div class="logo">PS</div>
+      <div class="brand-text">
+        <h1>Customer Statement Generator <span class="version">v1.1</span></h1>
+        <p id="brandCompany">Multi-company A/R statement tool</p>
+      </div>
+    </div>
+    <div class="brand-right">
+      <strong id="reportDate">—</strong>
+      Report cut-off
+    </div>
+  </header>
+
+  <section id="uploadSection">
+    <label class="upload-card" id="dropZone" for="fileInput">
+      <div class="icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <h2>Upload A/R Ageing Detail Report</h2>
+      <p>Drop the .xlsx file here, or click to browse</p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls" />
+    </label>
+    <div class="help-box">
+      <strong>Expected file:</strong> A/R Ageing Detail Report with the "Status of Payment" column filled in (column K). The tool reads <em>Sheet1</em> for invoices and uses <em>Customer Master</em> for Pvt/GVT classification when present. Company name is detected automatically from the report header.
+    </div>
+  </section>
+
+  <section id="dataSection" style="display:none;">
+    <div class="panel">
+      <div class="summary-bar">
+        <div class="stat"><div class="label">Customers</div><div class="value" id="stCustomers">0</div></div>
+        <div class="stat"><div class="label">Open Invoices</div><div class="value" id="stInvoices">0</div></div>
+        <div class="stat"><div class="label">Total Open Balance</div><div class="value" id="stOpenBal">0.00</div></div>
+        <div class="stat"><div class="label">Pending MoF Posting</div><div class="value" id="stPending">0</div></div>
+      </div>
+
+      <div id="diagnosticsBar"></div>
+
+      <div class="controls">
+        <input type="text" id="searchInput" placeholder="Search customer name…" />
+        <input type="text" id="preparedBy" placeholder="Prepared by (your name)" style="max-width:220px" />
+        <div class="filter-pills">
+          <button class="pill active" data-filter="all">All</button>
+          <button class="pill" data-filter="GVT">Government</button>
+          <button class="pill" data-filter="PVT">Private</button>
+          <button class="pill" data-filter="SEMI">Semi-GVT</button>
+        </div>
+        <button class="btn btn-bulk btn-bulk-amber" id="downloadMoftBtn" title="Download all Pending Submit to MOFT statements (GVT only)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Pending MOFT — Download All
+        </button>
+        <button class="btn btn-bulk" id="downloadAllBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download All as ZIP
+        </button>
+        <button class="btn btn-secondary" id="resetBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          New Upload
+        </button>
+      </div>
+
+      <div id="tableWrap"></div>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+// ---------- State ----------
+let parsedData = null;        // { reportDate, customers: [{name, type, invoices: [...] }] }
+let currentFilter = 'all';
+let currentSearch = '';
+
+// ---------- Helpers ----------
+const fmtMoney = (n) => {
+  if (n === null || n === undefined || n === '') return '';
+  const num = Number(n);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const toast = (msg) => {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+};
+
+// Excel serial date -> dd/mm/yyyy
+const excelDateToString = (val) => {
+  if (val === null || val === undefined || val === '') return '';
+  if (typeof val === 'string') return val.trim();
+  if (val instanceof Date) {
+    const d = String(val.getDate()).padStart(2, '0');
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const y = val.getFullYear();
+    return `${d}/${m}/${y}`;
+  }
+  if (typeof val === 'number') {
+    // Excel serial (1900 base, with 1900 leap-year bug)
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    const d = new Date(epoch.getTime() + val * 86400000);
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const yyyy = d.getUTCFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  return String(val);
+};
+
+const todayLabel = () => {
+  const d = new Date();
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${d.getDate()}-${months[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`;
+};
+
+const safeFile = (s) => s.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '');
+
+// ---------- File parsing ----------
+
+// Pick the data sheet (the A/R Ageing one) — it has 'Transaction type' + 'Open balance' headers
+function findDataSheet(wb) {
+  for (const name of wb.SheetNames) {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' });
+    for (let i = 0; i < Math.min(rows.length, 12); i++) {
+      const joined = rows[i].map(c => String(c).toLowerCase()).join('|');
+      if (joined.includes('transaction type') && joined.includes('open balance')) {
+        return { name, rows, headerIdx: i };
+      }
+    }
+  }
+  return null;
+}
+
+// Pick the customer master sheet — has 'Customer' name + a Pvt/GVT/Type column
+function findCustomerMasterSheet(wb, dataSheetName) {
+  for (const name of wb.SheetNames) {
+    if (name === dataSheetName) continue;
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' });
+    for (let i = 0; i < Math.min(rows.length, 12); i++) {
+      const cells = rows[i].map(c => String(c).toLowerCase().trim());
+      const hasCustomer = cells.some(c => /^customer( name)?$/.test(c) || c === 'customer');
+      const hasType = cells.some(c => /pvt|gvt|^type$|customer type/.test(c));
+      if (hasCustomer && hasType) {
+        return { name, rows, headerIdx: i };
+      }
+    }
+  }
+  return null;
+}
+
+function parseWorkbook(wb) {
+  const diagnostics = { warnings: [], info: {} };
+
+  // Find data sheet
+  const dataSheet = findDataSheet(wb);
+  if (!dataSheet) {
+    throw new Error('Could not find the A/R Ageing data sheet. Expected a sheet with "Transaction type" and "Open balance" headers.');
+  }
+  diagnostics.info.dataSheet = dataSheet.name;
+
+  // Find customer master (optional — used to enrich Pvt/GVT type)
+  const masterSheet = findCustomerMasterSheet(wb, dataSheet.name);
+  diagnostics.info.masterSheet = masterSheet ? masterSheet.name : '(none)';
+
+  // Build Customer Master map (name -> {type})
+  const masterMap = {};
+  if (masterSheet) {
+    const cm = masterSheet.rows;
+    const header = cm[masterSheet.headerIdx].map(c => String(c).toLowerCase().trim());
+    const nameCol = header.findIndex(c => /^customer( name)?$/.test(c));
+    const typeCol = header.findIndex(c => /pvt|gvt|^type$|customer type/.test(c));
+    for (let i = masterSheet.headerIdx + 1; i < cm.length; i++) {
+      const row = cm[i];
+      const nm = String(row[nameCol] || '').trim();
+      if (nm) {
+        masterMap[nm.toLowerCase()] = {
+          type: typeCol >= 0 ? String(row[typeCol] || '').trim().toUpperCase() : ''
+        };
+      }
+    }
+  }
+
+  // Match a customer name to the master map flexibly (handles truncated names like "Indira Gandhi Memorial Hospita")
+  const lookupType = (custName) => {
+    if (!custName) return '';
+    const key = custName.toLowerCase().trim();
+    if (masterMap[key]) return masterMap[key].type;
+    // Partial match: master contains start of customer name OR vice versa
+    for (const [mk, mv] of Object.entries(masterMap)) {
+      if (key.startsWith(mk) || mk.startsWith(key)) return mv.type;
+    }
+    return '';
+  };
+
+  // Sheet1 (data) — already loaded
+  const rows = dataSheet.rows;
+
+  // Detect "As of …" date and Company name from header rows
+  let reportDate = '';
+  let companyName = '';
+  for (const r of rows.slice(0, dataSheet.headerIdx)) {
+    const a = String(r[0] || '').trim();
+    if (!a) continue;
+    const m = a.match(/As of\s+(.+)/i);
+    if (m) { reportDate = m[1].trim(); continue; }
+    if (!companyName && !/^a\/?r ageing/i.test(a) && !/^as of/i.test(a)) {
+      companyName = a;
+    }
+  }
+  // Fallback: master sheet header
+  if (!companyName && masterSheet) {
+    for (const r of masterSheet.rows.slice(0, masterSheet.headerIdx)) {
+      const a = String(r[0] || '').trim();
+      if (a && !/customer master|as of/i.test(a)) { companyName = a; break; }
+    }
+  }
+  if (!companyName) companyName = 'Company Name';
+  diagnostics.info.companyName = companyName;
+  diagnostics.info.reportDate = reportDate || '(not detected)';
+
+  // Header row already located
+  const headerIdx = dataSheet.headerIdx;
+  const header = rows[headerIdx].map(c => String(c).toLowerCase().trim());
+
+  // Flexible column finder — accepts multiple aliases
+  const findCol = (aliases) => {
+    for (const alias of aliases) {
+      const i = header.findIndex(h => h === alias || h.includes(alias));
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  const ix = {
+    date:     findCol(['date']),
+    type:     findCol(['transaction type', 'transaction']),
+    number:   findCol(['number', 'invoice number', 'doc no']),
+    po:       findCol(['po number', 'po', 'purchase order']),
+    customer: findCol(['customer full name', 'customer name', 'customer']),
+    due:      findCol(['due date', 'due']),
+    amount:   findCol(['amount']),
+    open:     findCol(['open balance', 'balance', 'open']),
+    pgs:      findCol(['pvt/gvt/semi gvt', 'pvt/gvt', 'customer type', 'type']),
+    status:   findCol(['status of payment', 'status', 'payment status']),
+  };
+
+  // Sanity check & warn on missing critical columns
+  const required = ['date','type','number','customer','open','status'];
+  for (const k of required) {
+    if (ix[k] < 0) diagnostics.warnings.push(`Could not locate column for "${k}". Statements may be incomplete.`);
+  }
+
+  const grouped = {};
+  let skippedRows = 0;
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const r = rows[i];
+    const customer = String(r[ix.customer] || '').trim();
+    const txType = String(r[ix.type] || '').trim();
+    if (!customer || !txType) { skippedRows++; continue; }
+    if (txType.toLowerCase() !== 'invoice' && txType.toLowerCase() !== 'credit memo') { skippedRows++; continue; }
+
+    const open = Number(r[ix.open] || 0);
+    const status = String(r[ix.status] || '').trim();
+    if (Math.abs(open) < 0.01) continue;
+    if (Math.abs(open) < 1.00 && /cleared on/i.test(status)) continue;
+
+    const inv = {
+      date: excelDateToString(r[ix.date]),
+      type: txType,
+      number: String(r[ix.number] || '').trim(),
+      po: String(r[ix.po] || '').trim(),
+      customer,
+      due: excelDateToString(r[ix.due]),
+      amount: Number(r[ix.amount] || 0),
+      open,
+      pgs: String(r[ix.pgs] || '').trim().toUpperCase(),
+      status: status
+    };
+    // Classify status
+    const sl = status.toLowerCase();
+    if (/could not be found|contact agency/.test(sl)) inv.statusClass = 'pending_moft';
+    else if (/posted on/.test(sl)) inv.statusClass = 'pending_payment';
+    else if (/cleared on/.test(sl)) {
+      // "Cleared on" but still has substantial open balance → partial payment, treat as pending_payment
+      inv.statusClass = Math.abs(open) >= 1.00 ? 'pending_payment' : 'cleared';
+    }
+    else inv.statusClass = 'other';
+    if (!grouped[customer]) grouped[customer] = [];
+    grouped[customer].push(inv);
+  }
+
+  // Build customer list, sort invoices by date desc (matches your sample PDF)
+  const customers = Object.keys(grouped).sort((a, b) => a.localeCompare(b)).map(name => {
+    const invoices = grouped[name].slice().sort((a, b) => {
+      // sort by date descending; parse dd/mm/yyyy
+      const toD = (s) => {
+        const m = String(s).match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        return m ? new Date(+m[3], +m[2] - 1, +m[1]).getTime() : 0;
+      };
+      return toD(b.date) - toD(a.date);
+    });
+    const totalOpen = invoices.reduce((s, x) => s + x.open, 0);
+    const totalAmount = invoices.reduce((s, x) => s + x.amount, 0);
+    const type = lookupType(name) || invoices[0]?.pgs || '';
+
+    // Statement type buckets
+    const pendingMoft = invoices.filter(x => x.statusClass === 'pending_moft');
+    const pendingPayment = invoices.filter(x => x.statusClass === 'pending_payment');
+
+    return {
+      name, type, invoices, totalOpen, totalAmount,
+      pendingMoft, pendingPayment,
+      pendingMoftTotal: pendingMoft.reduce((s, x) => s + x.open, 0),
+      pendingPaymentTotal: pendingPayment.reduce((s, x) => s + x.open, 0)
+    };
+  });
+
+  diagnostics.info.invoicesProcessed = customers.reduce((s, c) => s + c.invoices.length, 0);
+  diagnostics.info.customersFound = customers.length;
+  diagnostics.info.skippedRows = skippedRows;
+  // Warn about customers whose type couldn't be classified
+  const unknownType = customers.filter(c => !c.type).map(c => c.name);
+  if (unknownType.length > 0) {
+    diagnostics.warnings.push(`${unknownType.length} customer(s) have no Pvt/GVT type detected — they will be treated as PVT (single SOA): ${unknownType.slice(0, 3).join(', ')}${unknownType.length > 3 ? '…' : ''}`);
+  }
+
+  return { reportDate, companyName, customers, diagnostics };
+}
+
+// ---------- Rendering ----------
+function renderAll() {
+  if (!parsedData) return;
+  document.getElementById('reportDate').textContent = parsedData.reportDate || todayLabel();
+  document.getElementById('brandCompany').textContent = parsedData.companyName || 'Multi-company A/R statement tool';
+
+  const list = filteredCustomers();
+
+  document.getElementById('stCustomers').textContent = parsedData.customers.length;
+  document.getElementById('stInvoices').textContent = parsedData.customers.reduce((s, c) => s + c.invoices.length, 0);
+  const totalOpen = parsedData.customers.reduce((s, c) => s + c.totalOpen, 0);
+  document.getElementById('stOpenBal').textContent = fmtMoney(totalOpen);
+  document.getElementById('stPending').textContent = parsedData.customers.reduce((s, c) => s + c.pendingMoft.length, 0);
+
+  // Diagnostics panel
+  const diagWrap = document.getElementById('diagnosticsBar');
+  const d = parsedData.diagnostics;
+  if (d) {
+    const hasWarn = d.warnings.length > 0;
+    diagWrap.innerHTML = `
+      <div class="diagnostics ${hasWarn ? 'has-warning' : ''}">
+        <div class="diag-meta">
+          <b>Detected:</b>
+          Company = ${escapeHtml(d.info.companyName)} ·
+          Data sheet = ${escapeHtml(d.info.dataSheet)} ·
+          Master sheet = ${escapeHtml(d.info.masterSheet)} ·
+          Report date = ${escapeHtml(d.info.reportDate)} ·
+          ${d.info.invoicesProcessed} open invoice${d.info.invoicesProcessed === 1 ? '' : 's'} across ${d.info.customersFound} customer${d.info.customersFound === 1 ? '' : 's'}
+        </div>
+        ${hasWarn ? `
+          <div class="diag-warnings">
+            <strong>⚠ Notices:</strong>
+            <ul>${d.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>
+          </div>` : ''}
+      </div>
+    `;
+  } else {
+    diagWrap.innerHTML = '';
+  }
+
+  const wrap = document.getElementById('tableWrap');
+  if (list.length === 0) {
+    wrap.innerHTML = `<div class="empty">
+      <svg class="empty-svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <div>No customers match your filter.</div>
+    </div>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table class="customers">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Type</th>
+          <th style="text-align:right">Invoices</th>
+          <th style="text-align:right">Open Balance (MVR)</th>
+          <th style="width:42%">Statements</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${list.map((c) => {
+          const isGvt = (c.type || '').toUpperCase() === 'GVT';
+          const cust = encodeURIComponent(c.name);
+          const stmtCells = [];
+          if (isGvt) {
+            stmtCells.push(stmtRow(cust, 'pending_moft',
+              `Pending Submit to MOFT`,
+              `${c.pendingMoft.length} inv · ${fmtMoney(c.pendingMoftTotal)}`,
+              c.pendingMoft.length > 0, 'amber'));
+            stmtCells.push(stmtRow(cust, 'pending_payment',
+              `Pending Payment from MOFT`,
+              `${c.pendingPayment.length} inv · ${fmtMoney(c.pendingPaymentTotal)}`,
+              c.pendingPayment.length > 0, 'blue'));
+            stmtCells.push(stmtRow(cust, 'combined',
+              `Combined SOA`,
+              `${c.invoices.length} inv · ${fmtMoney(c.totalOpen)}`,
+              true, 'green'));
+          } else {
+            stmtCells.push(stmtRow(cust, 'soa',
+              `SOA`,
+              `${c.invoices.length} inv · ${fmtMoney(c.totalOpen)}`,
+              true, 'green'));
+          }
+          return `
+            <tr>
+              <td><strong>${escapeHtml(c.name)}</strong></td>
+              <td>${typeBadge(c.type)}</td>
+              <td class="num">${c.invoices.length}</td>
+              <td class="num"><strong>${fmtMoney(c.totalOpen)}</strong></td>
+              <td><div class="stmt-stack">${stmtCells.join('')}</div></td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function stmtRow(custEnc, kind, label, sub, enabled, dotColor) {
+  const dotMap = { amber: 'var(--amber)', blue: 'var(--blue)', green: 'var(--green-500)' };
+  const disabled = enabled ? '' : 'disabled';
+  const opacity = enabled ? '' : 'style="opacity:0.4"';
+  return `
+    <div class="stmt-row" ${opacity}>
+      <span class="stmt-dot" style="background:${dotMap[dotColor]}"></span>
+      <div class="stmt-meta">
+        <div class="stmt-label">${label}</div>
+        <div class="stmt-sub">${sub}</div>
+      </div>
+      <div class="stmt-actions">
+        <button class="btn btn-secondary btn-sm" data-action="preview" data-cust="${custEnc}" data-kind="${kind}" ${disabled}>Preview</button>
+        <button class="btn btn-secondary btn-sm" data-action="xlsx" data-cust="${custEnc}" data-kind="${kind}" ${disabled}>Excel</button>
+        <button class="btn btn-primary btn-sm" data-action="pdf" data-cust="${custEnc}" data-kind="${kind}" ${disabled}>PDF</button>
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function typeBadge(t) {
+  const k = (t || '').toUpperCase();
+  if (k === 'GVT') return '<span class="badge gvt">GVT</span>';
+  if (k === 'PVT') return '<span class="badge pvt">PVT</span>';
+  if (k.startsWith('SEMI')) return '<span class="badge semi">SEMI</span>';
+  return '<span class="badge">—</span>';
+}
+
+function filteredCustomers() {
+  return parsedData.customers.filter(c => {
+    if (currentFilter !== 'all') {
+      const t = (c.type || '').toUpperCase();
+      if (currentFilter === 'GVT' && t !== 'GVT') return false;
+      if (currentFilter === 'PVT' && t !== 'PVT') return false;
+      if (currentFilter === 'SEMI' && !t.startsWith('SEMI')) return false;
+    }
+    if (currentSearch && !c.name.toLowerCase().includes(currentSearch.toLowerCase())) return false;
+    return true;
+  });
+}
+
+// ---------- Statement type configuration ----------
+// kind: 'pending_moft' | 'pending_payment' | 'combined' | 'soa'
+function statementMeta(customer, kind) {
+  const isGvt = (customer.type || '').toUpperCase() === 'GVT';
+  const dateStr = todayLabel().replace(/-/g, '_');
+  const safe = safeFile(customer.name);
+
+  switch (kind) {
+    case 'pending_moft':
+      return {
+        title: 'List of Invoice Pending to Submit to Ministry of Finance',
+        invoices: customer.pendingMoft,
+        filename: `${safe}_Pending_to_Submit_to_MOFT_${dateStr}`,
+        shortLabel: 'Pending MOFT Submit'
+      };
+    case 'pending_payment':
+      return {
+        title: 'List of Invoice Pending Payment from Ministry of Finance',
+        invoices: customer.pendingPayment,
+        filename: `${safe}_Pending_Payment_from_MOFT_${dateStr}`,
+        shortLabel: 'Pending MOFT Payment'
+      };
+    case 'combined':
+      return {
+        title: 'Statement of Account',
+        invoices: customer.invoices,
+        filename: `${safe}_SOA_${dateStr}`,
+        shortLabel: 'Combined SOA'
+      };
+    case 'soa':
+    default:
+      return {
+        title: 'Statement of Account',
+        invoices: customer.invoices,
+        filename: `${safe}_SOA_${dateStr}`,
+        shortLabel: 'SOA'
+      };
+  }
+}
+
+function getStatementsFor(customer) {
+  // Returns array of {kind, meta} representing what files apply
+  const isGvt = (customer.type || '').toUpperCase() === 'GVT';
+  const out = [];
+  if (isGvt) {
+    if (customer.pendingMoft.length > 0)    out.push({ kind: 'pending_moft',    meta: statementMeta(customer, 'pending_moft') });
+    if (customer.pendingPayment.length > 0) out.push({ kind: 'pending_payment', meta: statementMeta(customer, 'pending_payment') });
+    out.push({ kind: 'combined', meta: statementMeta(customer, 'combined') });
+  } else {
+    out.push({ kind: 'soa', meta: statementMeta(customer, 'soa') });
+  }
+  return out;
+}
+
+// ---------- PDF generation ----------
+function buildCustomerPdf(customer, kind) {
+  const meta = statementMeta(customer, kind);
+  const invoices = meta.invoices;
+  const totalAmount = invoices.reduce((s, x) => s + x.amount, 0);
+  const totalOpen   = invoices.reduce((s, x) => s + x.open, 0);
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 28;
+
+  // Header — brand block
+  doc.setFillColor(26, 107, 79);
+  doc.circle(margin + 14, 36, 13, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('PS', margin + 14, 40, { align: 'center' });
+
+  doc.setTextColor(15, 61, 46);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  const companyName = (parsedData && parsedData.companyName) || 'Company Name';
+  doc.text(companyName, margin + 36, 38);
+
+  // Title block
+  doc.setTextColor(13, 31, 23);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text(meta.title, margin, 78);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text(`Customer Name: ${customer.name}`, margin, 95);
+
+  const reportDate = parsedData.reportDate || todayLabel();
+  doc.text(`As of : ${reportDate}`, margin, 110);
+
+  // Prepared by (right-aligned)
+  const preparedBy = (document.getElementById('preparedBy')?.value || '').trim();
+  if (preparedBy) {
+    doc.setFontSize(9);
+    doc.setTextColor(91, 108, 100);
+    doc.text(`Prepared by: ${preparedBy}`, pageW - margin, 95, { align: 'right' });
+    doc.text(`Date: ${todayLabel()}`, pageW - margin, 110, { align: 'right' });
+  }
+
+  // Empty-table fallback
+  if (invoices.length === 0) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(11);
+    doc.setTextColor(150, 160, 155);
+    doc.text('No invoices in this category.', margin, 145);
+    return doc;
+  }
+
+  // Table
+  const head = [[
+    'Date', 'Transaction\ntype', 'Number', 'PO Number', 'Customer full name',
+    'Due date', 'Amount', 'Open balance', 'Pvt/GVT/\nSemi GVT', 'Status of Payment'
+  ]];
+  const body = invoices.map(inv => [
+    inv.date, inv.type, inv.number, inv.po, inv.customer, inv.due,
+    fmtMoney(inv.amount), fmtMoney(inv.open), inv.pgs, inv.status
+  ]);
+  body.push([
+    '', '', '', '', '', '',
+    { content: fmtMoney(totalAmount), styles: { fontStyle: 'bold' } },
+    { content: fmtMoney(totalOpen),   styles: { fontStyle: 'bold' } },
+    '', ''
+  ]);
+
+  doc.autoTable({
+    head, body,
+    startY: 122,
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    styles: {
+      font: 'helvetica', fontSize: 8, cellPadding: 4,
+      lineColor: [200, 210, 205], lineWidth: 0.4,
+      textColor: [13, 31, 23], valign: 'middle', overflow: 'linebreak'
+    },
+    headStyles: {
+      fillColor: [26, 107, 79], textColor: [255, 255, 255],
+      fontStyle: 'bold', fontSize: 8, halign: 'left'
+    },
+    columnStyles: {
+      0: { cellWidth: 55 }, 1: { cellWidth: 50 }, 2: { cellWidth: 75 },
+      3: { cellWidth: 95 }, 4: { cellWidth: 110 }, 5: { cellWidth: 55 },
+      6: { cellWidth: 65, halign: 'right' }, 7: { cellWidth: 70, halign: 'right' },
+      8: { cellWidth: 50, halign: 'center' }, 9: { cellWidth: 'auto' }
+    },
+    didParseCell: (data) => {
+      if (data.section === 'body') {
+        const status = String(data.row.raw[9] || '').toLowerCase();
+        if (data.column.index === 9) {
+          if (status.includes('could not be found') || status.includes('please contact agency')) {
+            data.cell.styles.textColor = [183, 110, 0];
+            data.cell.styles.fillColor = [255, 245, 224];
+          } else if (status.includes('posted on')) {
+            data.cell.styles.textColor = [10, 95, 168];
+          } else if (status.includes('cleared on')) {
+            data.cell.styles.textColor = [42, 157, 111];
+          }
+        }
+        if (data.row.index === body.length - 1) {
+          data.cell.styles.fillColor = [230, 244, 238];
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    },
+    didDrawPage: () => {
+      const pageH = doc.internal.pageSize.getHeight();
+      doc.setFontSize(8);
+      doc.setTextColor(150, 160, 155);
+      doc.setFont('helvetica', 'normal');
+      doc.text(
+        `Generated ${new Date().toLocaleString('en-GB')}  •  ${companyName}${preparedBy ? '  •  Prepared by: ' + preparedBy : ''}`,
+        margin, pageH - 16
+      );
+      doc.text(`Page ${doc.internal.getNumberOfPages()}`, pageW - margin, pageH - 16, { align: 'right' });
+    }
+  });
+
+  return doc;
+}
+
+// ---------- Excel generation ----------
+function buildCustomerXlsx(customer, kind) {
+  const meta = statementMeta(customer, kind);
+  const invoices = meta.invoices;
+  const totalAmount = invoices.reduce((s, x) => s + x.amount, 0);
+  const totalOpen   = invoices.reduce((s, x) => s + x.open, 0);
+  const companyName = (parsedData && parsedData.companyName) || 'Company Name';
+  const reportDate = parsedData.reportDate || todayLabel();
+  const preparedBy = (document.getElementById('preparedBy')?.value || '').trim();
+
+  const aoa = [];
+  aoa.push([companyName]);
+  aoa.push([meta.title]);
+  aoa.push([`Customer Name: ${customer.name}`]);
+  aoa.push([`As of: ${reportDate}`]);
+  if (preparedBy) aoa.push([`Prepared by: ${preparedBy}`, '', '', '', '', '', '', '', '', `Date: ${todayLabel()}`]);
+  aoa.push([]);
+  aoa.push(['Date','Transaction type','Number','PO Number','Customer full name','Due date','Amount','Open balance','Pvt/GVT/Semi GVT','Status of Payment']);
+  for (const inv of invoices) {
+    aoa.push([inv.date, inv.type, inv.number, inv.po, inv.customer, inv.due, inv.amount, inv.open, inv.pgs, inv.status]);
+  }
+  aoa.push(['','','','','','Total', totalAmount, totalOpen, '', '']);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 22 }, { wch: 28 },
+    { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 8 }, { wch: 60 }
+  ];
+
+  // Number formatting on Amount + Open balance columns
+  const headerRowIdx = aoa.findIndex(r => r[0] === 'Date');
+  const numFmt = '#,##0.00';
+  for (let i = headerRowIdx + 1; i < aoa.length; i++) {
+    for (const col of ['G', 'H']) {
+      const ref = `${col}${i + 1}`;
+      if (ws[ref] && typeof ws[ref].v === 'number') ws[ref].z = numFmt;
+    }
+  }
+
+  // Bold the title rows + header row + totals row using cell styles (xlsx-style note: SheetJS community build doesn't apply styles, but Excel still opens it cleanly)
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Statement');
+
+  const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+// ---------- Download helpers ----------
+function downloadStatement(customer, kind, format) {
+  const meta = statementMeta(customer, kind);
+  if (meta.invoices.length === 0 && kind !== 'combined' && kind !== 'soa') {
+    toast('No invoices in this category');
+    return;
+  }
+  if (format === 'pdf') {
+    const doc = buildCustomerPdf(customer, kind);
+    doc.save(`${meta.filename}.pdf`);
+  } else {
+    const blob = buildCustomerXlsx(customer, kind);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `${meta.filename}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+}
+
+function previewStatement(customer, kind) {
+  const doc = buildCustomerPdf(customer, kind);
+  const url = doc.output('bloburl');
+  window.open(url, '_blank');
+}
+
+async function downloadAllZip() {
+  const list = filteredCustomers();
+  if (list.length === 0) { toast('Nothing to download'); return; }
+  const btn = document.getElementById('downloadAllBtn');
+  btn.disabled = true;
+  btn.textContent = `Building statements…`;
+
+  const zip = new JSZip();
+  let fileCount = 0;
+  for (const c of list) {
+    const folder = zip.folder(safeFile(c.name));
+    const statements = getStatementsFor(c);
+    for (const { kind, meta } of statements) {
+      // PDF
+      const doc = buildCustomerPdf(c, kind);
+      folder.file(`${meta.filename}.pdf`, doc.output('blob'));
+      // Excel
+      folder.file(`${meta.filename}.xlsx`, buildCustomerXlsx(c, kind));
+      fileCount += 2;
+    }
+  }
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(zipBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Customer_Statements_${todayLabel().replace(/-/g,'_')}.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download All as ZIP`;
+  toast(`Built ${fileCount} files for ${list.length} customers`);
+}
+
+async function downloadAllPendingMoft() {
+  // Across ALL GVT customers (ignores current Pvt/GVT filter), respects search filter
+  const eligible = parsedData.customers.filter(c => {
+    if ((c.type || '').toUpperCase() !== 'GVT') return false;
+    if (c.pendingMoft.length === 0) return false;
+    if (currentSearch && !c.name.toLowerCase().includes(currentSearch.toLowerCase())) return false;
+    return true;
+  });
+
+  if (eligible.length === 0) { toast('No GVT customers with Pending Submit to MOFT'); return; }
+
+  const btn = document.getElementById('downloadMoftBtn');
+  btn.disabled = true;
+  const originalHtml = btn.innerHTML;
+  btn.textContent = `Building ${eligible.length} statements…`;
+
+  const dateStr = todayLabel().replace(/-/g, '_');
+
+  // Build the two inner ZIPs (PDFs and Excels) in memory…
+  const pdfZip = new JSZip();
+  const xlsxZip = new JSZip();
+  for (const c of eligible) {
+    const meta = statementMeta(c, 'pending_moft');
+    const doc = buildCustomerPdf(c, 'pending_moft');
+    pdfZip.file(`${meta.filename}.pdf`, doc.output('blob'));
+    xlsxZip.file(`${meta.filename}.xlsx`, buildCustomerXlsx(c, 'pending_moft'));
+  }
+  const pdfBlob  = await pdfZip.generateAsync({ type: 'blob' });
+  const xlsxBlob = await xlsxZip.generateAsync({ type: 'blob' });
+
+  // …then bundle them into a single parent ZIP — one file = one browser download prompt.
+  const parent = new JSZip();
+  parent.file(`Pending_Submit_to_MOFT_PDF_${dateStr}.zip`,   pdfBlob);
+  parent.file(`Pending_Submit_to_MOFT_Excel_${dateStr}.zip`, xlsxBlob);
+  const parentBlob = await parent.generateAsync({ type: 'blob' });
+
+  const url = URL.createObjectURL(parentBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Pending_Submit_to_MOFT_${dateStr}.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  btn.disabled = false;
+  btn.innerHTML = originalHtml;
+  toast(`Downloaded ZIP covering ${eligible.length} GVT customers`);
+}
+
+// ---------- File handling ----------
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array', cellDates: true });
+      parsedData = parseWorkbook(wb);
+      document.getElementById('uploadSection').style.display = 'none';
+      document.getElementById('dataSection').style.display = 'block';
+      renderAll();
+      toast(`Loaded ${parsedData.customers.length} customers`);
+    } catch (err) {
+      console.error(err);
+      alert('Could not parse this file: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ---------- Wire-up ----------
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+['dragenter', 'dragover'].forEach(ev =>
+  dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.add('drag'); })
+);
+['dragleave', 'drop'].forEach(ev =>
+  dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.remove('drag'); })
+);
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  currentSearch = e.target.value;
+  renderAll();
+});
+
+document.querySelectorAll('.pill').forEach(p => {
+  p.addEventListener('click', () => {
+    document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
+    p.classList.add('active');
+    currentFilter = p.dataset.filter;
+    renderAll();
+  });
+});
+
+document.getElementById('tableWrap').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn || btn.disabled) return;
+  const customerName = decodeURIComponent(btn.dataset.cust);
+  const kind = btn.dataset.kind;
+  const c = parsedData.customers.find(x => x.name === customerName);
+  if (!c) return;
+  const action = btn.dataset.action;
+  if (action === 'preview') previewStatement(c, kind);
+  else if (action === 'pdf')  downloadStatement(c, kind, 'pdf');
+  else if (action === 'xlsx') downloadStatement(c, kind, 'xlsx');
+});
+
+document.getElementById('downloadAllBtn').addEventListener('click', downloadAllZip);
+document.getElementById('downloadMoftBtn').addEventListener('click', downloadAllPendingMoft);
+
+// Persist Prepared by name across sessions
+const preparedByInput = document.getElementById('preparedBy');
+try { preparedByInput.value = localStorage.getItem('ps_preparedBy') || ''; } catch(e) {}
+preparedByInput.addEventListener('input', (e) => {
+  try { localStorage.setItem('ps_preparedBy', e.target.value); } catch(err) {}
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  parsedData = null;
+  fileInput.value = '';
+  document.getElementById('uploadSection').style.display = 'block';
+  document.getElementById('dataSection').style.display = 'none';
+});
+</script>
+</body>
+</html>
